@@ -122,7 +122,6 @@ def auth_regist():
             "pwd": pwd_receive,
             "nickname": nickname_receive,
             "user_likes": 0,
-            "rank": 0,
         }
         db.users.insert_one(users)
         return jsonify({"result": "success", "msg": "회원가입이 완료되었습니다."})
@@ -130,56 +129,82 @@ def auth_regist():
 
 # ============================= Dashboard ================================
 # 대시보드 Refresh
-@app.route('/dashboard', methods = ['GET'])
+@app.route('/dashboard', methods=['GET'])
 def update_dashboard():
     # 0) 현재 페이지 정보 get
     user_id = my_id()
     page = request.args.get("page", default=1, type=int)
     sort_method = request.args.get("sort", default="default")
-
-    if (sort_method == "my_post"):
-        total_count = db.posts.count_documents({"author_id": user_id})
-    elif sort_method in ("default", "recent", "wonder"):
-        total_count = db.posts.count_documents({})
-    page_count = max(1, (total_count + 9) // 10)
+    problem_num = request.args.get("problem_num", type=int)
 
     page_size = 10
-    skip_range = (page - 1) * page_size
-    # 1) 랭킹 Top3 추출
-    rankers = list(db.users.find({}).sort('score', -1).limit(3))
-
-    # 2) 게시물 리스트 10개 리스트 업
     post_filter = {}
-    sort_spec = [("_id", -1)] 
+    sort_spec = [("_id", -1)]
 
+    # 1) 문제번호 검색 조건 
+    if problem_num is not None:
+        post_filter["problem_num"] = problem_num
 
+    # 2) 정렬 / 내 글 보기 조건
     if sort_method in ("default", "recent"):
         sort_spec = [("_id", -1)]
-    elif sort_method == "wonder":  
+    elif sort_method == "wonder":
         sort_spec = [("wonders", -1), ("_id", -1)]
     elif sort_method == "my_post":
-        post_filter = {"author_id": user_id}
+        post_filter["author_id"] = user_id  
+        sort_spec = [("_id", -1)]
+    else:
+        sort_method = "default"
         sort_spec = [("_id", -1)]
 
-    posts = list(db.posts.find(post_filter).sort(sort_spec).skip(skip_range).limit(page_size))
+    # 3) 전체 개수 / 페이지 수
+    total_count = db.posts.count_documents(post_filter)
+    page_count = max(1, (total_count + page_size - 1) // page_size)
+
+    # 페이지 보정
+    if page < 1:
+        page = 1
+    if page > page_count:
+        page = page_count
+
+    skip_range = (page - 1) * page_size
+
+    # 4) 랭킹 Top3 추출
+    rankers = list(db.users.find({}).sort('user_likes', -1).limit(3))
+
+    # 5) 게시물 리스트 조회
+    posts = list(
+        db.posts.find(post_filter)
+        .sort(sort_spec)
+        .skip(skip_range)
+        .limit(page_size)
+    )
 
     for p in posts:
-        p["id"] = str(p["_id"]) 
+        p["id"] = str(p["_id"])
 
-    # 3) 사용자 정보 (닉네임, 등수)
+    # 6) 사용자 정보 (닉네임, 등수)
     user = db.users.find_one({"id": user_id})
 
-    user_rank = None
     if user:
-        my_score = user.get("score", 0)  # score 없으면 0 처리
-        higher_count = db.users.count_documents({"score": {"$gt": my_score}
-        })
-        user_rank = higher_count + 1
+        my_score = user.get("score", 0)
+        higher_count = db.users.count_documents({"score": {"$gt": my_score}})
+        user["rank"] = higher_count + 1
 
-    # 4) 알람 유무 확인(notifications 컬렉션 열람해서 isRead 컬럼이 1인 데이터 유무 확인)
-    has_unread = db.notifications.count_documents({"user_id": user_id, "isRead": 0}) > 0
+    # 7) 알람 유무 확인
+    has_unread = db.notifications.count_documents({"id": user_id, "isRead": 0}) > 0
 
-    return render_template("dashboard.html", page = page, user = user, rankers = rankers, posts = posts, page_count = page_count, has_unread = has_unread)
+    return render_template(
+        "dashboard.html",
+        page=page,
+        user=user,
+        rankers=rankers,
+        posts=posts,
+        page_count=page_count,
+        has_unread=has_unread,
+        sort=sort_method,          # 템플릿에서 정렬 상태 유지용
+        problem_num=problem_num    # 검색창 값 유지용
+    )
 # ============================= Dashboard ================================
 
 # =============================== Posts ==================================
@@ -261,59 +286,62 @@ def add_wonder(post_id):
     # 사용자가 해당 게시글에 궁금해를 누른 적 있나 검사
     had_wonder = db.wonders.find_one({'user_id': user_id, 'post_id': oid})
     if had_wonder is not None:
-        return jsonify({'result': 'failure', 'msg': '이미 궁금해 눌렀음'}), 409
+        return redirect(url_for("show_post", post_id=post_id))
 
     try:
         db.wonders.insert_one({"user_id": user_id, "post_id": oid})
     except DuplicateKeyError:
-        return jsonify({"result": "failure", "msg": "중복 클릭 감지"}), 409
+        return redirect(url_for("show_post", post_id=post_id))
     
     # 게시글 궁금해 수 증가
     db.posts.update_one({'_id': oid}, {'$inc': {'wonders': 1}})
-    updated_post = db.posts.find_one({'_id': oid}, {'wonders': 1})
 
-    return jsonify({
-        'result': 'success',
-        'wonders': updated_post.get('wonders', 0)
-    })
-
+    # 다시 게시글 페이지로 이동 (GET)
+    return redirect(url_for("show_post", post_id=post_id))
         
 # =============================== Posts ==================================
 
     
 # ============================== Comments ================================
 # 댓글 작성
-@app.route("/post/<post_id>/comment")
+@app.route("/post/<post_id>/comment", methods=["POST"])
 def create_comment(post_id):
     try:
         oid = ObjectId(post_id)
     except:
         abort(404)
 
-    description_receive = request.form.get("description_give")
+    description_receive = request.form.get("description_give", "").strip()
+    if not description_receive:
+        return redirect(url_for("show_post", post_id=post_id))
 
     user_id = my_id()
-    nickname = db.users.find_one({"user_id": user_id}, {"nickname": 1, "_id": 0})
+    if not user_id:
+        return redirect(url_for("show_post", post_id=post_id))
+
+    user_doc = db.users.find_one({"user_id": user_id}, {"nickname": 1, "_id": 0})
+    nickname = user_doc.get("nickname", "") if user_doc else ""
+
     now = dt.datetime.now(ZoneInfo("Asia/Seoul"))
     now_text = f"{now.year}. {now.month}. {now.day}. {now.hour:02d}:{now.minute:02d}"
 
     doc = {
         "user_id": user_id,
-        "nickname": nickname,
+        "nickname": nickname,      # 문자열로 저장
         "description": description_receive,
         "created_at": now_text,
         "post_id": oid,
         "comment_likes": 0
     }
-    db.comments.insert_one(doc)
-    return jsonify({'result': 'success'}), 201
 
-# 댓글 좋아요
+    db.comments.insert_one(doc)
+    return redirect(url_for("show_post", post_id=post_id))
+
 @app.route("/post/<post_id>/comment/<comment_id>/likes", methods=["POST"])
 def likes_comment(post_id, comment_id):
-    user_id = my_id()  # 로그인 아이디 문자열
+    user_id = my_id()
     if not user_id:
-        return jsonify({"result": "failure", "msg": "로그인이 필요합니다."}), 401
+        return redirect(url_for("show_post", post_id=post_id))
 
     # 1) ID 형식 검사
     try:
@@ -325,7 +353,7 @@ def likes_comment(post_id, comment_id):
     # 2) 댓글 존재 확인 + 해당 게시글 소속 댓글인지 확인
     comment = db.comments.find_one({"_id": comment_oid, "post_id": post_oid})
     if comment is None:
-        return jsonify({"result": "failure", "msg": "해당 댓글 없음"}), 404
+        return redirect(url_for("show_post", post_id=post_id))
 
     # 3) 중복 좋아요 검사 (likes 컬렉션)
     had_like = db.likes.find_one({
@@ -333,37 +361,32 @@ def likes_comment(post_id, comment_id):
         "comment_id": comment_oid
     })
     if had_like is not None:
-        return jsonify({"result": "failure", "msg": "이미 좋아요를 눌렀습니다."}), 409
+        return redirect(url_for("show_post", post_id=post_id))
 
-    # 4) likes 컬렉션에 좋아요 기록 저장 (확실히 눌린 경우)
-    db.likes.insert_one({
-        "user_id": user_id,
-        "comment_id": comment_oid
-    })
+    # 4) likes 컬렉션에 좋아요 기록 저장
+    try:
+        db.likes.insert_one({
+            "user_id": user_id,
+            "comment_id": comment_oid
+        })
+    except DuplicateKeyError:
+        return redirect(url_for("show_post", post_id=post_id))
 
-    # 5) 댓글 주인의 likes 개수 + 1
-    comment_owner_id = comment.get("user_id")   # 댓글 작성자 id (문자열)
-
+    # 5) 댓글 작성자(user)의 받은 좋아요 수 증가
+    comment_owner_id = comment.get("user_id")
     if comment_owner_id:
         db.users.update_one(
-            {"id": comment_owner_id},           # users 컬렉션의 유저 식별 컬럼
+            {"user_id": comment_owner_id},   # <- id 아님
             {"$inc": {"user_likes": 1}}
         )
 
     # 6) 댓글 좋아요 수 증가
     db.comments.update_one(
         {"_id": comment_oid},
-        {"$inc": {"wonders": 1}}
+        {"$inc": {"comment_likes": 1}}
     )
 
-    # 7) 증가된 좋아요 수 반환
-    updated_comment = db.comments.find_one({"_id": comment_oid}, {"wonders": 1, "_id": 0})
-    wonders = updated_comment.get("wonders", 0) if updated_comment else 0
-
-    return jsonify({
-        "result": "success",
-        "wonders": wonders
-    }), 200
+    return redirect(url_for("show_post", post_id=post_id))
 
 # ============================== Comments ================================
 

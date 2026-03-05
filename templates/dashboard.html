@@ -115,10 +115,27 @@
               궁금해순
             </a>
 
-            <a href="/dashboard?page=1&sort=mine&boj={{ boj }}"
-              class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100">
-              작성글 보기
-            </a>
+            <form
+              action="/dashboard"
+              method="get"
+              class="flex items-center gap-2"
+            >
+              <input type="hidden" name="sort" value="{{ sort_method }}" />
+              <input
+                name="problem_num"
+                value="{{ problem_num }}"
+                type="text"
+                inputmode="numeric"
+                placeholder="백준 번호"
+                class="w-40 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-400"
+              />
+              <button
+                type="submit"
+                class="px-3 py-1.5 text-sm rounded-lg bg-green-500 text-black whitespace-nowrap hover:opacity-90"
+              >
+                🔎
+              </button>
+            </form>
           </div>
 
           <form action="/dashboard" method="get" class="flex items-center gap-2">
