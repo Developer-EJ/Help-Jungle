@@ -1,119 +1,138 @@
 <!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
 
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
 
-  <title>Dashboard | 도와줘요 JUNGLE</title>
-</head>
+    <title>Dashboard | 도와줘요 JUNGLE</title>
+  </head>
 
-<body class="bg-gray-100">
+  <body class="bg-gray-100">
+    <div class="max-w-5xl mx-auto bg-white min-h-screen">
+      <!-- HEADER -->
+      <header class="border-b bg-white">
+        <div
+          class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between"
+        >
+          <a href="/dashboard" class="font-bold text-lg hover:opacity-80">
+            도와줘요 <span class="text-green-500">JUNGLE</span>
+          </a>
 
-  <div class="max-w-5xl mx-auto bg-white min-h-screen">
+          <div class="flex items-center gap-3">
+            <!-- 알림 버튼 -->
+            <button id="notif_btn" type="button"
+                class="relative p-2 rounded-lg border hover:bg-gray-50 {% if has_unread %}bg-red-100{% endif %}"
+                aria-label="알림">
+                🔔
+                {% if has_unread %}
+                <!-- 빨간 점 -->
+                <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+                {% endif %}
+            </button>
 
-    <!-- HEADER -->
-    <header class="border-b bg-white">
-      <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-        <a href="/dashboard" class="font-bold text-lg hover:opacity-80">
-          도와줘요 <span class="text-green-500">JUNGLE</span>
-        </a>
+            <span class="text-sm text-gray-700 whitespace-nowrap">
+              <span class="text-xs text-gray-500 ml-2">{{ user.rank }}</span> 등
+              <span class="font-semibold">{{ user.nickname }}</span> 님
+            </span>
 
-        <div class="flex items-center gap-3">
-
-          <!-- 알림 버튼 -->
-          <button id="notif_btn" type="button"
-            class="relative p-2 rounded-lg border hover:bg-gray-50 {% if has_unread %}bg-red-100{% endif %}"
-            aria-label="알림">
-            🔔
-            {% if has_unread %}
-              <!-- 빨간 점 -->
-              <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
-            {% endif %}
-          </button>
-
-          <span class="text-sm text-gray-700 whitespace-nowrap">
-            <span class="text-xs text-gray-500 ml-2">{{ rank }}</span> 등
-            <span class="font-semibold">{{ user_id }}</span> 님
-          </span>
-
-          <button id="logout_btn"
-            class="px-4 py-1.5 rounded-lg border text-sm hover:bg-gray-50 whitespace-nowrap">
-            로그아웃
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <!-- MAIN -->
-    <main class="px-4 py-6">
-
-      <!-- 글쓰기 버튼 -->
-      <div class="flex justify-end mb-4">
-        <a href="/post/new" class="px-4 py-2 rounded-lg bg-green-500 text-black text-sm hover:opacity-90">
-          + 글쓰기
-        </a>
-      </div>
-
-      <!-- TOP 3 -->
-      <section class="mt-6 bg-green-100 px-10 py-10 rounded-lg">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-bold text-lg">🏆 TOP 3</h2>
-        </div>
-
-        <div class="flex items-end justify-center gap-4">
-          <div class="w-28">
-            <div class="text-center text-sm font-semibold mb-2">
-              {{ rankers[1].nickname }}
-            </div>
-            <div class="h-24 rounded-t-xl bg-gray-200 flex items-center justify-center font-extrabold text-xl">
-              2
-            </div>
-          </div>
-
-          <div class="w-28">
-            <div class="text-center text-sm font-semibold mb-2">
-              {{ rankers[0].nickname }}
-            </div>
-            <div class="h-32 rounded-t-xl bg-yellow-200 flex items-center justify-center font-extrabold text-xl">
-              1
-            </div>
-          </div>
-
-          <div class="w-28">
-            <div class="text-center text-sm font-semibold mb-2">
-              {{ rankers[2].nickname }}
-            </div>
-            <div class="h-20 rounded-t-xl bg-orange-200 flex items-center justify-center font-extrabold text-xl">
-              3
-            </div>
+            <button
+              id="logout_btn"
+              class="px-4 py-1.5 rounded-lg border text-sm hover:bg-gray-50 whitespace-nowrap"
+            >
+              로그아웃
+            </button>
           </div>
         </div>
-      </section>
+      </header>
 
-      <!-- 게시글 영역 -->
-      <section class="mt-6 bg-white px-6 py-6 rounded-lg">
-
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-bold text-lg">📌 게시글</h2>
+      <!-- MAIN -->
+      <main class="px-4 py-6">
+        <!-- 글쓰기 버튼 -->
+        <div class="flex justify-end mb-4">
+          <a
+            href="/post/create"
+            class="px-4 py-2 rounded-lg bg-green-500 text-black text-sm hover:opacity-90"
+          >
+            + 글쓰기
+          </a>
         </div>
 
-        <!-- 정렬 버튼 + 검색 -->
-        <div class="flex items-center justify-between gap-3 mb-3">
+        <!-- TOP 3 -->
+        <section class="mt-6 bg-green-100 px-10 py-10 rounded-lg">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-lg">🏆 TOP 3</h2>
+          </div>
 
-          <div class="flex gap-2">
-            <a href="/dashboard?page=1&sort=recent&boj={{ boj }}"
-              class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100">
-              최신순
-            </a>
+          <div class="flex items-end justify-center gap-4">
+            <div class="w-28">
+              <div class="text-center text-sm font-semibold mb-2">
+                {% if rankers|length > 1 %}{{ rankers[1].nickname }}{% endif %}
+              </div>
+              <div
+                class="h-24 rounded-t-xl bg-gray-200 flex items-center justify-center font-extrabold text-xl"
+              >
+                2
+              </div>
+            </div>
 
-            <a href="/dashboard?page=1&sort=wonders&boj={{ boj }}"
-              class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100">
-              궁금해순
-            </a>
+            <div class="w-28">
+              <div class="text-center text-sm font-semibold mb-2">
+                {% if rankers|length > 0 %}{{ rankers[0].nickname }}{% endif %}
+              </div>
+              <div
+                class="h-32 rounded-t-xl bg-yellow-200 flex items-center justify-center font-extrabold text-xl"
+              >
+                1
+              </div>
+            </div>
+
+            <div class="w-28">
+              <div class="text-center text-sm font-semibold mb-2">
+                {% if rankers|length > 2 %}{{ rankers[2].nickname }}{% endif %}
+              </div>
+              <div
+                class="h-20 rounded-t-xl bg-orange-200 flex items-center justify-center font-extrabold text-xl"
+              >
+                3
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 게시글 영역 -->
+        <section class="mt-6 bg-white px-6 py-6 rounded-lg">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-lg">📌 게시글</h2>
+          </div>
+
+          <!-- 정렬 버튼 + 검색 -->
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="flex gap-2">
+              <a
+                href="/dashboard?page=1&sort=recent&boj={{ boj }}"
+                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100"
+              >
+                최신순
+              </a>
+
+              <a
+                href="/dashboard?page=1&sort=wonder&boj={{ boj }}"
+                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100"
+              >
+                궁금해순
+              </a>
+
+              <a
+                href="/dashboard?page=1&sort=my_post&boj={{ boj }}"
+                class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100"
+              >
+                작성글 보기
+              </a>
+            </div>
 
             <form
               action="/dashboard"
@@ -138,72 +157,64 @@
             </form>
           </div>
 
-          <form action="/dashboard" method="get" class="flex items-center gap-2">
-            <input type="hidden" name="sort" value="{{ sort_method }}">
-            <input name="boj" value="{{ boj }}" type="text" inputmode="numeric" placeholder="백준 번호"
-              class="w-40 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-400" />
-            <button type="submit"
-              class="px-3 py-1.5 text-sm rounded-lg bg-green-500 text-black whitespace-nowrap hover:opacity-90">
-              🔎
-            </button>
-          </form>
+          <!-- 게시글 테이블 -->
+          <div class="border rounded-xl overflow-hidden">
+            <div
+              class="grid grid-cols-12 bg-gray-50 text-xs text-gray-600 font-semibold px-4 py-3"
+            >
+              <div class="col-span-2">문제번호</div>
+              <div class="col-span-5">제목</div>
+              <div class="col-span-1 text-center">궁금해</div>
+              <div class="col-span-2">작성자</div>
+              <div class="col-span-2">작성일</div>
+            </div>
 
-        </div>
-
-        <!-- 게시글 테이블 -->
-        <div class="border rounded-xl overflow-hidden">
-
-          <div class="grid grid-cols-12 bg-gray-50 text-xs text-gray-600 font-semibold px-4 py-3">
-            <div class="col-span-2">문제번호</div>
-            <div class="col-span-5">제목</div>
-            <div class="col-span-1 text-center">궁금해</div>
-            <div class="col-span-2">작성자</div>
-            <div class="col-span-2">작성일</div>
-          </div>
-
-          {% if posts %}
-            {% for post in posts %}
-              <!-- 백에서 post_id가 아니라 _id로 줄 가능성이 높음: 필요하면 post._id로 바꾸세요 -->
-              <a href="/post/{{ post._id }}"
-                class="grid grid-cols-12 px-4 py-3 border-t hover:bg-gray-50 items-center text-sm">
-                <div class="col-span-2 text-gray-700">{{ post.problem_num }}</div>
-                <div class="col-span-5 font-medium text-gray-900 truncate">{{ post.title }}</div>
-                <div class="col-span-1 text-center">{{ post.wonders }}</div>
-                <div class="col-span-2 text-gray-700 truncate">{{ post.nickname }}</div>
-                <div class="col-span-2 text-gray-500 text-xs">{{ post.created_at }}</div>
-              </a>
-            {% endfor %}
-          {% else %}
+            {% if posts %} {% for post in posts %}
+            <a
+              href="{{ url_for('show_post', post_id=post['id']) }}"
+              class="grid grid-cols-12 px-4 py-3 border-t hover:bg-gray-50 items-center text-sm"
+            >
+              <div class="col-span-2 text-gray-700">{{ post.problem_num }}</div>
+              <div class="col-span-5 font-medium text-gray-900 truncate">
+                {{ post.title }}
+              </div>
+              <div class="col-span-1 text-center">{{ post.wonders }}</div>
+              <div class="col-span-2 text-gray-700 truncate">
+                {{ post.author_nickname }}
+              </div>
+              <div class="col-span-2 text-gray-500 text-xs">
+                {{ post.created_at }}
+              </div>
+            </a>
+            {% endfor %} {% else %}
             <div class="px-4 py-10 text-center text-sm text-gray-500">
               게시글이 없습니다.
             </div>
-          {% endif %}
-
-        </div>
-
-        <!-- 페이지 번호 (오른쪽 정렬 / 숫자만) -->
-        <div class="mt-4 flex justify-end gap-2">
-          {% for p in range(1, page_count + 1) %}
-            {% if p == page %}
-              <span class="px-3 py-1.5 rounded-lg text-sm bg-green-500 text-black font-semibold">
-                {{ p }}
-              </span>
-            {% else %}
-              <a href="/dashboard?page={{ p }}&sort={{ sort_method }}&boj={{ boj }}"
-                class="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-100">
-                {{ p }}
-              </a>
             {% endif %}
-          {% endfor %}
-        </div>
+          </div>
 
-      </section>
+          <!-- 페이지 번호 (오른쪽 정렬 / 숫자만) -->
+          <div class="mt-4 flex justify-end gap-2">
+            {% for p in range(1, page_count + 1) %} {% if p == page %}
+            <span
+              class="px-3 py-1.5 rounded-lg text-sm bg-green-500 text-black font-semibold"
+            >
+              {{ p }}
+            </span>
+            {% else %}
+            <a
+              href="/dashboard?page={{ p }}&sort={{ sort_method }}&boj={{ boj }}"
+              class="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-100"
+            >
+              {{ p }}
+            </a>
+            {% endif %} {% endfor %}
+          </div>
+        </section>
+      </main>
+    </div>
 
-    </main>
-  </div>
-
-
-  <div id="notif_modal" class="fixed inset-0 hidden items-center justify-center bg-black/50 px-4 z-50">
+    <div id="notif_modal" class="fixed inset-0 hidden items-center justify-center bg-black/50 px-4 z-50">
     <div class="bg-white w-full max-w-lg rounded-2xl shadow-lg border">
       <div class="flex items-center justify-between px-5 py-4 border-b">
         <h2 class="font-bold text-lg">알림</h2>
@@ -212,9 +223,7 @@
           닫기
         </button>
       </div>
-
       <div class="p-5 space-y-3">
-
         {% if notifications %}
           {% for n in notifications %}
             <div class="border rounded-xl p-4 {% if not n.is_read %}bg-red-50{% endif %}">
@@ -230,11 +239,9 @@
                   알림을 보냈습니다.
                 {% endif %}
               </div>
-
               <div class="text-xs text-gray-500 mt-1">
                 {{ n.created_at }}
               </div>
-
               {% if not n.is_read %}
                 <div class="mt-2 text-xs text-red-500">NEW</div>
               {% endif %}
@@ -245,40 +252,36 @@
             알림이 없습니다.
           </div>
         {% endif %}
-
       </div>
     </div>
   </div>
 
 
-  <script>
-    // 로그아웃
-    $("#logout_btn").click(function () {
-      $.removeCookie('mytoken', { path: '/' });
-      alert('로그아웃 되었습니다.');
-      window.location.href = "/";
-    });
+    </div>
 
-    // 알림 모달 열기/닫기 (AJAX 없음)
+    <script>
+      $('#logout_btn').click(function () {
+        $.removeCookie('mytoken', { path: '/' }); // 쿠키 삭제
+        alert('로그아웃 되었습니다.');
+        window.location.href = '/'; // 로그인 페이지로 이동
+      });
+
+      // 알림 모달 열기/닫기 (AJAX 없음)
     $(function () {
       $("#notif_btn").on("click", function () {
         $("#notif_modal").removeClass("hidden").addClass("flex");
       });
-
       $("#notif_close").on("click", function () {
         closeNotifModal();
       });
-
       // 배경 클릭하면 닫기
       $("#notif_modal").on("click", function (e) {
         if (e.target === this) closeNotifModal();
       });
     });
-
     function closeNotifModal() {
       $("#notif_modal").addClass("hidden").removeClass("flex");
     }
-  </script>
-
-</body>
+    </script>
+  </body>
 </html>
