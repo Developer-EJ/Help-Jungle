@@ -81,7 +81,7 @@ def auth_login():
     if user is not None:            
         payload = {
             'id' : id_receive,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=3600)
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=10800)
         }
         token = jwt.encode(payload, SECRET_KEY, algorithm = 'HS256')
         return jsonify({"result": "success", "msg": "로그인 성공", "token" : token})
