@@ -348,7 +348,57 @@ def add_wonder(post_id):
 
     # 다시 게시글 페이지로 이동 (GET)
     return redirect(url_for("show_post", post_id=post_id))
-        
+
+# 게시글 삭제
+@app.route("/post/<post_id>/delete", methods=["POST"])
+def delete_post(post_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
+    user_id = my_id()
+
+    # 1) ObjectId 변환
+    try:
+        oid = ObjectId(post_id)
+    except:
+        abort(400)
+
+    # 2) 게시글 존재 확인
+    post = db.posts.find_one({"_id": oid})
+    if post is None:
+        abort(404)
+
+    # 3) 작성자 본인 확인
+    if post.get("author_id") != user_id:
+        return alert_redirect("삭제 권한이 없습니다.", f"/post/{post_id}")
+
+    # 4) 연관 데이터(게시글 내 댓글) 삭제
+    # 4-1) 해당 게시글의 댓글 목록 조회
+    comment_oids = [c["_id"] for c in db.comments.find({"post_id": oid}, {"_id": 1})]
+
+    # 4-2) 댓글 좋아요 기록 삭제
+    if comment_oids:
+        db.likes.delete_many({"comment_id": {"$in": comment_oids}})
+
+    # 4-3) 댓글 삭제
+    db.comments.delete_many({"post_id": oid})
+
+    # 4-4) 궁금해 기록 삭제
+    db.wonders.delete_many({"post_id": oid})
+
+    # 5) 게시글 삭제
+    db.posts.delete_one({"_id": oid})
+
+    # 6) 삭제 후 메인화면으로 빠져나가기
+    return redirect(url_for("update_dashboard"))
+
 # =============================== Posts ==================================
 
     
@@ -457,6 +507,47 @@ def likes_comment(post_id, comment_id):
     )
 
     return redirect(url_for("show_post", post_id=post_id))
+
+# 댓글 삭제
+@app.route("/post/<post_id>/comment/<comment_id>/delete", methods=["POST"])
+def delete_comment(post_id, comment_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
+    user_id = my_id()
+
+    # 1) ObjectId 변환
+    try:
+        post_oid = ObjectId(post_id)
+        comment_oid = ObjectId(comment_id)
+    except:
+        abort(400)
+
+    # 2) 댓글 존재 확인 + 해당 게시글 소속 댓글인지 확인
+    comment = db.comments.find_one({"_id": comment_oid, "post_id": post_oid})
+    if comment is None:
+        abort(404)
+
+    # 3) 작성자 본인 확인
+    if comment.get("user_id") != user_id:
+        return alert_redirect("삭제 권한이 없습니다.", f"/post/{post_id}")
+
+    # 4) 해당 댓글에 달린 좋아요 기록 삭제
+    db.likes.delete_many({"comment_id": comment_oid})
+
+    # 5) 댓글 삭제
+    db.comments.delete_one({"_id": comment_oid})
+
+    # 6) 기존 게시글 화면 다시 뿌리기
+    return redirect(url_for("show_post", post_id=post_id))
+
 
 # ============================== Comments ================================
 
