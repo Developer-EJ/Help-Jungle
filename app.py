@@ -1,9 +1,8 @@
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for, flash
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, flash, abort
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from os import abort
 from pymongo.errors import DuplicateKeyError
 
 
@@ -132,11 +131,16 @@ def auth_regist():
 @app.route('/dashboard', methods = ['GET'])
 def update_dashboard():
     # 0) 현재 페이지 정보 get
-    total_count = db.posts.count_documents({})
-    page_count = (total_count + 9) // 10  
-
+    user_id = my_id()
     page = request.args.get("page", default=1, type=int)
     sort_method = request.args.get("sort", default="default")
+
+    if (sort_method == "my_post"):
+        total_count = db.posts.count_documents({"author_id": user_id})
+    elif sort_method in ("default", "recent", "wonder"):
+        total_count = db.posts.count_documents({})
+    page_count = max(1, (total_count + 9) // 10)
+
     page_size = 10
     skip_range = (page - 1) * page_size
     # 1) 랭킹 Top3 추출
@@ -146,23 +150,24 @@ def update_dashboard():
     post_filter = {}
     sort_spec = [("_id", -1)] 
 
+
     if sort_method in ("default", "recent"):
         sort_spec = [("_id", -1)]
     elif sort_method == "wonder":  
         sort_spec = [("wonders", -1), ("_id", -1)]
     elif sort_method == "my_post":
-        user_id = my_id()
-        post_filter = {"author_Id": user_id}
+        post_filter = {"author_id": user_id}
         sort_spec = [("_id", -1)]
 
     posts = list(db.posts.find(post_filter).sort(sort_spec).skip(skip_range).limit(page_size))
 
     # 3) 사용자 정보 (닉네임, 등수)
+    user = db.users.find_one({"user_id": user_id})
 
     # 4) 알람 유무 확인(notifications 컬렉션 열람해서 isRead 컬럼이 1인 데이터 유무 확인)
-    has_unread = db.notifications.count_documents({"userId": user_id, "isRead": 0}) > 0
+    has_unread = db.notifications.count_documents({"user_id": user_id, "isRead": 0}) > 0
 
-    return render_template("dashboard.html", page = page, rankers = rankers, posts = posts, page_count = page_count, has_unread = has_unread)
+    return render_template("dashboard.html", page = page, user = user, rankers = rankers, posts = posts, page_count = page_count, has_unread = has_unread)
 # ============================= Dashboard ================================
 
 # =============================== Posts ==================================
@@ -212,7 +217,7 @@ def create_post():
         "problem_num": int(problem_num_receive),
         "title": title_receive,
         "content": content_receive,
-        "authorId": user_id ,
+        "author_id": user_id ,
         "created_at": now_text,
         "wonders": 0,
         "commentCount": 0,
