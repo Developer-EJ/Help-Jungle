@@ -81,7 +81,7 @@ def auth_login():
     if user is not None:            
         payload = {
             'id' : id_receive,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=3600)
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=10800)
         }
         token = jwt.encode(payload, SECRET_KEY, algorithm = 'HS256')
         return jsonify({"result": "success", "msg": "로그인 성공", "token" : token})
@@ -131,6 +131,16 @@ def auth_regist():
 # 대시보드 Refresh
 @app.route('/dashboard', methods=['GET'])
 def update_dashboard():
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+    
     # 0) 현재 페이지 정보 get
     user_id = my_id()
     page = request.args.get("page", default=1, type=int)
@@ -212,6 +222,16 @@ def update_dashboard():
 # 게시물 페이지 출력 
 @app.route("/post/<post_id>", methods=["GET"])
 def show_post(post_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     # 1) ObjectId로 변환
     try:
         oid = ObjectId(post_id)
@@ -244,11 +264,31 @@ def show_post(post_id):
 # 게시물 제작 페이지 출력
 @app.route("/post/create", methods=["GET"])
 def new_post_page():
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     return render_template("createPost.html")
 
 # 게시물 페이지 제작
 @app.route("/post/new", methods = ["POST"])
 def create_post():
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     problem_num_receive = request.form.get("problem_num_give")
     title_receive = request.form.get("title_give")
     content_receive = request.form.get("content_give")
@@ -286,6 +326,16 @@ def create_post():
 # 게시물 궁금해 버튼
 @app.route("/post/<post_id>/wonder", methods=["POST"])
 def add_wonder(post_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     user_id = my_id()
     if not user_id:
         return redirect(url_for("show_post", post_id=post_id))
@@ -335,7 +385,57 @@ def add_wonder(post_id):
 
     # 다시 게시글 페이지로 이동 (GET)
     return redirect(url_for("show_post", post_id=post_id))
-        
+
+# 게시글 삭제
+@app.route("/post/<post_id>/delete", methods=["POST"])
+def delete_post(post_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
+    user_id = my_id()
+
+    # 1) ObjectId 변환
+    try:
+        oid = ObjectId(post_id)
+    except:
+        abort(400)
+
+    # 2) 게시글 존재 확인
+    post = db.posts.find_one({"_id": oid})
+    if post is None:
+        abort(404)
+
+    # 3) 작성자 본인 확인
+    if post.get("author_id") != user_id:
+        return alert_redirect("삭제 권한이 없습니다.", f"/post/{post_id}")
+
+    # 4) 연관 데이터(게시글 내 댓글) 삭제
+    # 4-1) 해당 게시글의 댓글 목록 조회
+    comment_oids = [c["_id"] for c in db.comments.find({"post_id": oid}, {"_id": 1})]
+
+    # 4-2) 댓글 좋아요 기록 삭제
+    if comment_oids:
+        db.likes.delete_many({"comment_id": {"$in": comment_oids}})
+
+    # 4-3) 댓글 삭제
+    db.comments.delete_many({"post_id": oid})
+
+    # 4-4) 궁금해 기록 삭제
+    db.wonders.delete_many({"post_id": oid})
+
+    # 5) 게시글 삭제
+    db.posts.delete_one({"_id": oid})
+
+    # 6) 삭제 후 메인화면으로 빠져나가기
+    return redirect(url_for("update_dashboard"))
+
 # =============================== Posts ==================================
 
     
@@ -343,6 +443,16 @@ def add_wonder(post_id):
 # 댓글 작성
 @app.route("/post/<post_id>/comment", methods=["POST"])
 def create_comment(post_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     try:
         oid = ObjectId(post_id)
     except:
@@ -393,6 +503,16 @@ def create_comment(post_id):
 
 @app.route("/post/<post_id>/comment/<comment_id>/likes", methods=["POST"])
 def likes_comment(post_id, comment_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     user_id = my_id()
     if not user_id:
         return redirect(url_for("show_post", post_id=post_id))
@@ -463,6 +583,47 @@ def likes_comment(post_id, comment_id):
         db.notifications.insert_one(notify_doc)
 
     return redirect(url_for("show_post", post_id=post_id))
+
+# 댓글 삭제
+@app.route("/post/<post_id>/comment/<comment_id>/delete", methods=["POST"])
+def delete_comment(post_id, comment_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
+    user_id = my_id()
+
+    # 1) ObjectId 변환
+    try:
+        post_oid = ObjectId(post_id)
+        comment_oid = ObjectId(comment_id)
+    except:
+        abort(400)
+
+    # 2) 댓글 존재 확인 + 해당 게시글 소속 댓글인지 확인
+    comment = db.comments.find_one({"_id": comment_oid, "post_id": post_oid})
+    if comment is None:
+        abort(404)
+
+    # 3) 작성자 본인 확인
+    if comment.get("user_id") != user_id:
+        return alert_redirect("삭제 권한이 없습니다.", f"/post/{post_id}")
+
+    # 4) 해당 댓글에 달린 좋아요 기록 삭제
+    db.likes.delete_many({"comment_id": comment_oid})
+
+    # 5) 댓글 삭제
+    db.comments.delete_one({"_id": comment_oid})
+
+    # 6) 기존 게시글 화면 다시 뿌리기
+    return redirect(url_for("show_post", post_id=post_id))
+
 
 # ============================== Comments ================================
 
