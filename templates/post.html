@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
@@ -12,12 +13,14 @@
             font-weight: 300;
             font-display: swap;
         }
+
         body {
             font-family: 'Pretendard', sans-serif;
         }
     </style>
     <title> 게시글 </title>
 </head>
+
 <body class="bg-gray-100">
     <div class="max-w-5xl mx-auto bg-white min-h-screen">
         <header class="border-b bg-white">
@@ -40,37 +43,106 @@
                 </div>
             </div>
         </header>
+
         <!-- 본문 -->
-        <div>
-            <!-- db에 저장된 게시글 -->
-            <div> db에 저장된 게시글
+        <div class="px-6 py-10">
+            <!-- 게시글 -->
+            {% for post in users %}
+            <div>
                 <!-- 문제번호 -->
-                <div class="">
-                    {% for problem in problems %}
-                    {% endfor %}
+                <div>
+                    {% for post in users %}
+                    <span class="font-bold">문제번호</span>
+                    <div class="font-medium">{{ post.problem_num }}</div>
                 </div>
                 <!-- 제목 -->
                 <div>
+                    <span class="font-bold">제목</span>
+                    <div class="font-medium">{{ post.title }}</div>
                 </div>
-                <!-- 본문 -->
+                <!-- 내용 -->
                 <div>
+                    <span class="font-bold">내용</span>
+                    <div class="font-medium">{{ post.content }}</div>
                 </div>
-                <!-- 궁금해 : 이미지 삽입, 기능 연결 -->
+                <!-- 궁금해  -->
                 <div>
+                    <div class="flex justify-center items-center">
+                        {% for post in posts %}
+                        <img src="https://openmoji.org/data/color/svg/1F914.svg" alt="thinking" class="w-12 h-12">
+                        <div>{{ post.wonders }}</div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
+            {% endfor %}
             <!-- 댓글 -->
             <div>
                 <!-- 댓글 작성창  -->
                 <div>
+                    <form>
+                        <label for="comment" class="font-bold">댓글</label>
+                        <textarea id="comment"
+                            class="min-h-48 appearance-none w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:bg-white focus:border-gray-900 resize-none"></textarea>
+                        <div class="flex justify-end">
+                            <button
+                                class="flex justify-end items-end font-bold px-5 py-2 bg-green-500 rounded-md text-black hover:opacity-90"
+                                onclick="postDescription()">작성</button>
+                        </div>
+                    </form>
                 </div>
-                <!-- 작성된 댓글 -->
+                <!-- 작성된 댓글 : 닉네임, 댓글내용, 작성일자, 좋아요 -->
                 <div>
+                    <div>
+                        {% for post in comments %}
+                        <img src="https://openmoji.org/data/color/svg/1F44D.svg" alt="likes" class="w-12 h-12">
+                        <div> {{ post. likes }} </div>
+                        {% endfor %}
+                        <!-- 좋아요 이모지 -->
+                    </div>
+
                 </div>
             </div>
         </div>
     </div>
-        <script>
- 
-        </script>
+    <script>
+        $("#logout_btn").click(function () {
+            $.removeCookie('mytoken', { path: '/' }); // 쿠키 삭제
+            alert('로그아웃 되었습니다.');
+            window.location.href = "/"; // 로그인 페이지로 이동
+        });
+
+
+        function postComment() {
+
+            // 유저 아이드는 어디서? 쿠키로?
+            let
+                let comment = $("#comment").val();
+
+            $.ajax({
+                type: "POST",
+                url: "/post/<post_id>/comment/new",
+                data: {
+                    // 유저 아이디 : id 
+                    // 닉네임
+                    comment_give: comment,
+                },
+
+                success: function (response) {
+
+                    if (response.result == "success") {
+                        alert("댓글 작성 성공");
+                        window.location.href = "/dashboard";
+                    } else {
+                        alert("댓글 작성 실패");
+                    }
+
+                }
+
+            });
+        }
+
+
+
+    </script>
 </body>
