@@ -30,19 +30,28 @@
           <a href="/dashboard" class="font-bold text-lg hover:opacity-80">
             도와줘요 <span class="text-green-500">JUNGLE</span>
           </a>
+
           <div class="flex items-center gap-3">
+            <!-- 알림 버튼 -->
             <button
               id="notif_btn"
               type="button"
-              class="relative p-2 rounded-lg border hover:bg-gray-50 {% if has_unread %}bg-red-100{% endif %}"
+              class="relative p-2 rounded-lg border hover:bg-gray-50 {% if notifications %}bg-red-100{% endif %}"
               aria-label="알림"
             >
-              🔔
+              🔔 {% if notifications %}
+              <!-- 빨간 점 -->
+              <span
+                class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"
+              ></span>
+              {% endif %}
             </button>
-            <span class="text-sm text-gray-700">
-              <span class="text-xs text-gray-500 ml-2">{{ rank }}</span> 등
-              <span class="font-semibold">{{ user_id }}</span> 님
+
+            <span class="text-sm text-gray-700 whitespace-nowrap">
+              <span class="text-xs text-gray-500 ml-2">{{ user_rank }}</span> 등
+              <span class="font-semibold">{{ user.nickname }}</span> 님
             </span>
+
             <button
               id="logout_btn"
               class="px-4 py-1.5 rounded-lg border text-sm hover:bg-gray-50 whitespace-nowrap"
@@ -70,12 +79,17 @@
               <div class="text-xs text-gray-500 mt-2">
                 작성자
                 <span class="font-semibold text-gray-700"
-                  >{{ post.nickname }}</span
+                  >{{ post.author_nickname }}</span
                 >
                 · {{ post.created_at }}
               </div>
             </div>
             <!-- 궁금해 버튼 -->
+            {% if user_id == post.author_id %}
+            <form action="/posts/{{ post.id }}/delete" method="POST">
+              <button class="text-red-500 text-sm">삭제</button>
+            </form>
+            {% endif %}
           </div>
           <!-- 내용 -->
           <div class="mt-6 whitespace-pre-wrap text-gray-800 leading-relaxed">
@@ -137,7 +151,7 @@
               <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
                   <div class="text-sm font-semibold text-gray-800 truncate">
-                    {{ c.created_at }}
+                    {{ c.nickname }}
                   </div>
                   <div class="text-xs text-gray-500 mt-0.5">
                     {{ c.created_at }}
@@ -168,6 +182,52 @@
             </div>
             {% endif %}
           </div>
+          <div id="notif_modal" class="fixed inset-0 hidden items-center justify-center bg-black/50 px-4 z-50">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-lg border">
+      <div class="flex items-center justify-between px-5 py-4 border-b">
+        <h2 class="font-bold text-lg">알림</h2>
+        <button id="notif_close" type="button"
+          class="px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50">
+          닫기
+        </button>
+      </div>
+      <div class="p-5 space-y-3">
+        {% if notifications %}
+          {% for n in notifications %}
+            <form action="{{ url_for('go_notification_page', notification_id=n._id) }}" method="POST">
+              <button type="submit" class="w-full text-left">
+                <div class="border rounded-xl p-4 hover:bg-gray-50 {% if n.isRead == 0 %}bg-red-50{% endif %}">
+                  <div class="text-sm text-gray-900">
+                    <span class="font-semibold">{{ n.sender_nickname }}</span>님이(가)
+                    {% if n.type == "comment" %}
+                      {{ n.post_title }} 게시글에 댓글을 달았습니다.
+                    {% elif n.type == "wonder" %}
+                      {{ n.post_title }} 게시글에 궁금해요를 눌렀습니다.
+                    {% elif n.type == "like" %}
+                      내 댓글에 좋아요를 눌렀습니다.
+                    {% else %}
+                      알림을 보냈습니다.
+                    {% endif %}
+                  </div>
+
+                  <div class="text-xs text-gray-500 mt-1">
+                    {{ n.created_at }}
+                  </div>
+
+                  {% if n.isRead == 0 %}
+                    <div class="mt-2 text-xs text-red-500">NEW</div>
+                  {% endif %}
+                </div>
+              </button>
+            </form>
+          {% endfor %}
+        {% else %}
+          <div class="text-sm text-gray-500 text-center py-10">
+            알림이 없습니다.
+          </div>
+        {% endif %}
+      </div>
+    </div>
         </section>
       </main>
     </div>
@@ -178,6 +238,23 @@
         alert('로그아웃 되었습니다.');
         window.location.href = '/';
       });
+
+      // 알림 모달 열기/닫기 (AJAX 없음)
+    $(function () {
+      $("#notif_btn").on("click", function () {
+        $("#notif_modal").removeClass("hidden").addClass("flex");
+      });
+      $("#notif_close").on("click", function () {
+        closeNotifModal();
+      });
+      // 배경 클릭하면 닫기
+      $("#notif_modal").on("click", function (e) {
+        if (e.target === this) closeNotifModal();
+      });
+    });
+    function closeNotifModal() {
+      $("#notif_modal").addClass("hidden").removeClass("flex");
+    }
     </script>
   </body>
 </html>

@@ -186,24 +186,25 @@ def update_dashboard():
     # 6) 사용자 정보 (닉네임, 등수)
     user = db.users.find_one({"id": user_id})
 
+    user_rank = None
     if user:
         my_score = user.get("score", 0)
-        higher_count = db.users.count_documents({"score": {"$gt": my_score}})
-        user["rank"] = higher_count + 1
+        user_rank = db.users.count_documents({"score": {"$gt": my_score}}) + 1
 
-    # 7) 알람 유무 확인
-    has_unread = db.notifications.count_documents({"id": user_id, "isRead": 0}) > 0
+    # 7) 안 읽은 알림 목록 조회
+    notifications = list(db.notifications.find({"receiver_id": user_id, "isRead": 0}).sort("_id", -1))
 
     return render_template(
         "dashboard.html",
         page=page,
         user=user,
+        user_rank=user_rank,
         rankers=rankers,
         posts=posts,
         page_count=page_count,
-        has_unread=has_unread,
-        sort=sort_method,          # 템플릿에서 정렬 상태 유지용
-        problem_num=problem_num    # 검색창 값 유지용
+        notifications=notifications,
+        sort=sort_method,        
+        problem_num=problem_num
     )
 # ============================= Dashboard ================================
 
@@ -225,8 +226,20 @@ def show_post(post_id):
     # 3) 댓글 불러오기
     comments = list(db.comments.find({"post_id": oid}))
 
+    # 4) 사용자 정보 가져오기
+    user_id = my_id()
 
-    return render_template("post.html", post=post, comments = comments)
+    # 5) 유저 정보 넘기기
+    user = db.users.find_one({"id": user_id})
+
+    user_rank = None
+    if user:
+        my_score = user.get("score", 0)
+        user_rank = db.users.count_documents({"score": {"$gt": my_score}}) + 1
+
+    # 6) 알람 목록 조회
+    notifications = list(db.notifications.find({"receiver_id": user_id, "isRead": 0}).sort("_id", -1))
+    return render_template("post.html", post=post, comments = comments, user_id = user_id, user = user, user_rank = user_rank, notifications = notifications)
 
 # 게시물 제작 페이지 출력
 @app.route("/post/create", methods=["GET"])
@@ -274,27 +287,51 @@ def create_post():
 @app.route("/post/<post_id>/wonder", methods=["POST"])
 def add_wonder(post_id):
     user_id = my_id()
+    if not user_id:
+        return redirect(url_for("show_post", post_id=post_id))
     try:
         oid = ObjectId(post_id)
     except:
         abort(400)
 
-    post = db.posts.find_one({'_id': oid})
+    # 게시글 조회 
+    post = db.posts.find_one({"_id": oid}, {"author_id": 1, "title": 1})
     if post is None:
-        return jsonify({'result': 'failure', 'msg': '해당 게시글 없음'}), 404
-    
+        return jsonify({"result": "failure", "msg": "해당 게시글 없음"}), 404
+
     # 사용자가 해당 게시글에 궁금해를 누른 적 있나 검사
-    had_wonder = db.wonders.find_one({'user_id': user_id, 'post_id': oid})
+    had_wonder = db.wonders.find_one({"user_id": user_id, "post_id": oid})
     if had_wonder is not None:
         return redirect(url_for("show_post", post_id=post_id))
 
+    # 닉네임 조회 
+    user_doc = db.users.find_one({"id": user_id}, {"nickname": 1, "_id": 0})
+    nickname = user_doc.get("nickname", "") if user_doc else user_id
+
+    # 궁금해 기록 저장
     try:
         db.wonders.insert_one({"user_id": user_id, "post_id": oid})
     except DuplicateKeyError:
         return redirect(url_for("show_post", post_id=post_id))
-    
+
     # 게시글 궁금해 수 증가
-    db.posts.update_one({'_id': oid}, {'$inc': {'wonders': 1}})
+    db.posts.update_one({"_id": oid}, {"$inc": {"wonders": 1}})
+
+    # 알림 생성
+    author_id = post.get("author_id")
+    post_title = post.get("title", "알 수 없는 게시글")
+
+    if author_id and author_id != user_id:
+        notify_doc = {
+            "receiver_id": author_id,
+            "sender_id": user_id,          
+            "sender_nickname": nickname,    
+            "post_id": oid,                
+            "post_title": post_title,     
+            "type": "wonder",               
+            "isRead": 0
+        }
+        db.notifications.insert_one(notify_doc)
 
     # 다시 게시글 페이지로 이동 (GET)
     return redirect(url_for("show_post", post_id=post_id))
@@ -319,7 +356,7 @@ def create_comment(post_id):
     if not user_id:
         return redirect(url_for("show_post", post_id=post_id))
 
-    user_doc = db.users.find_one({"user_id": user_id}, {"nickname": 1, "_id": 0})
+    user_doc = db.users.find_one({"id": user_id}, {"nickname": 1, "_id": 0})
     nickname = user_doc.get("nickname", "") if user_doc else ""
 
     now = dt.datetime.now(ZoneInfo("Asia/Seoul"))
@@ -327,14 +364,31 @@ def create_comment(post_id):
 
     doc = {
         "user_id": user_id,
-        "nickname": nickname,      # 문자열로 저장
+        "nickname": nickname, 
         "description": description_receive,
         "created_at": now_text,
         "post_id": oid,
         "comment_likes": 0
     }
-
     db.comments.insert_one(doc)
+
+    # 알림 생성
+    post = db.posts.find_one({"_id": oid}, {"author_id": 1, "title": 1})
+    author_id = post.get("author_id") if post else None
+    post_title = post.get("title", "알 수 없는 게시글") if post else "알 수 없는 게시글"
+    
+    if author_id and author_id != user_id:
+        notify_doc = {
+            "receiver_id": author_id,
+            "sender_id": user_id,
+            "sender_nickname": nickname,
+            "post_id": oid,
+            "post_title": post_title,
+            "type": "comment",
+            "isRead": 0
+        }
+        db.notifications.insert_one(notify_doc)
+
     return redirect(url_for("show_post", post_id=post_id))
 
 @app.route("/post/<post_id>/comment/<comment_id>/likes", methods=["POST"])
@@ -372,11 +426,11 @@ def likes_comment(post_id, comment_id):
     except DuplicateKeyError:
         return redirect(url_for("show_post", post_id=post_id))
 
-    # 5) 댓글 작성자(user)의 받은 좋아요 수 증가
+    # 5) 댓글 작성자의 받은 좋아요 수 증가
     comment_owner_id = comment.get("user_id")
     if comment_owner_id:
         db.users.update_one(
-            {"user_id": comment_owner_id},   # <- id 아님
+            {"id": comment_owner_id},
             {"$inc": {"user_likes": 1}}
         )
 
@@ -386,9 +440,52 @@ def likes_comment(post_id, comment_id):
         {"$inc": {"comment_likes": 1}}
     )
 
+    # 7) 알림 생성 (댓글 작성자에게)
+    # 자기 댓글에 자기가 누른 경우는 알림 생략
+    if comment_owner_id and comment_owner_id != user_id:
+        # 닉네임
+        sender_doc = db.users.find_one({"id": user_id}, {"nickname": 1, "_id": 0})
+        sender_nickname = sender_doc.get("nickname", "") if sender_doc else user_id
+
+        # 게시글 제목
+        post_doc = db.posts.find_one({"_id": post_oid}, {"title": 1, "_id": 0})
+        post_title = post_doc.get("title", "알 수 없는 게시글") if post_doc else "알 수 없는 게시글"
+
+        notify_doc = {
+            "receiver_id": comment_owner_id,    #
+            "sender_id": user_id,               
+            "sender_nickname": sender_nickname, 
+            "post_id": post_oid,               
+            "post_title": post_title,        
+            "type": "like",
+            "isRead": 0
+        }
+        db.notifications.insert_one(notify_doc)
+
     return redirect(url_for("show_post", post_id=post_id))
 
 # ============================== Comments ================================
+
+# ============================= notifications ============================
+@app.route("/notifications/<notification_id>/go", methods=["POST"])
+def go_notification_page(notification_id):
+    user_id = my_id()
+    if not user_id:
+        return redirect(url_for("update_dashboard"))
+
+    try:
+        oid = ObjectId(notification_id)
+    except:
+        abort(400)
+
+    notify = db.notifications.find_one({"_id": oid, "receiver_id": user_id})
+    if not notify:
+        return redirect(url_for("update_dashboard"))
+
+    post_id = str(notify.get("post_id"))
+
+    db.notifications.delete_one({"_id": oid, "receiver_id": user_id})
+    return redirect(url_for("show_post", post_id=post_id))
 
 if __name__ == "__main__":
 	    app.run("0.0.0.0", port=5000, debug=True)
