@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, flash, abort
 from pymongo import MongoClient
 from bson.objectid import ObjectId
-from datetime import datetime
+import datetime as dt
 from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
@@ -120,7 +120,9 @@ def auth_regist():
         users = {
             "id": id_receive,
             "pwd": pwd_receive,
-            "nickname": nickname_receive
+            "nickname": nickname_receive,
+            "user_likes": 0,
+            "rank": 0,
         }
         db.users.insert_one(users)
         return jsonify({"result": "success", "msg": "회원가입이 완료되었습니다."})
@@ -161,8 +163,18 @@ def update_dashboard():
 
     posts = list(db.posts.find(post_filter).sort(sort_spec).skip(skip_range).limit(page_size))
 
+    for p in posts:
+        p["id"] = str(p["_id"]) 
+
     # 3) 사용자 정보 (닉네임, 등수)
-    user = db.users.find_one({"user_id": user_id})
+    user = db.users.find_one({"id": user_id})
+
+    user_rank = None
+    if user:
+        my_score = user.get("score", 0)  # score 없으면 0 처리
+        higher_count = db.users.count_documents({"score": {"$gt": my_score}
+        })
+        user_rank = higher_count + 1
 
     # 4) 알람 유무 확인(notifications 컬렉션 열람해서 isRead 컬럼이 1인 데이터 유무 확인)
     has_unread = db.notifications.count_documents({"user_id": user_id, "isRead": 0}) > 0
@@ -191,6 +203,11 @@ def show_post(post_id):
 
     return render_template("post.html", post=post, comments = comments)
 
+# 게시물 제작 페이지 출력
+@app.route("/post/create", methods=["GET"])
+def new_post_page():
+    return render_template("createPost.html")
+
 # 게시물 페이지 제작
 @app.route("/post/new", methods = ["POST"])
 def create_post():
@@ -210,14 +227,17 @@ def create_post():
 
     # 게시 시간 및 저자 저장
     user_id = my_id()
-    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    user_doc = db.users.find_one({'id': user_id})
+    author_nickname = user_doc.get('nickname') if user_doc else None
+    now = dt.datetime.now(ZoneInfo("Asia/Seoul"))
     now_text = f"{now.year}. {now.month}. {now.day}. {now.hour:02d}:{now.minute:02d}"
 
     doc = {
-        "problem_num": int(problem_num_receive),
+        "problem_num": problem_num_receive,
         "title": title_receive,
         "content": content_receive,
         "author_id": user_id ,
+        "author_nickname": author_nickname,
         "created_at": now_text,
         "wonders": 0,
         "commentCount": 0,
@@ -274,7 +294,7 @@ def create_comment(post_id):
 
     user_id = my_id()
     nickname = db.users.find_one({"user_id": user_id}, {"nickname": 1, "_id": 0})
-    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    now = dt.datetime.now(ZoneInfo("Asia/Seoul"))
     now_text = f"{now.year}. {now.month}. {now.day}. {now.hour:02d}:{now.minute:02d}"
 
     doc = {
@@ -321,13 +341,22 @@ def likes_comment(post_id, comment_id):
         "comment_id": comment_oid
     })
 
-    # 5) 댓글 좋아요 수 증가
+    # 5) 댓글 주인의 likes 개수 + 1
+    comment_owner_id = comment.get("user_id")   # 댓글 작성자 id (문자열)
+
+    if comment_owner_id:
+        db.users.update_one(
+            {"id": comment_owner_id},           # users 컬렉션의 유저 식별 컬럼
+            {"$inc": {"user_likes": 1}}
+        )
+
+    # 6) 댓글 좋아요 수 증가
     db.comments.update_one(
         {"_id": comment_oid},
         {"$inc": {"wonders": 1}}
     )
 
-    # 6) 증가된 좋아요 수 반환
+    # 7) 증가된 좋아요 수 반환
     updated_comment = db.comments.find_one({"_id": comment_oid}, {"wonders": 1, "_id": 0})
     wonders = updated_comment.get("wonders", 0) if updated_comment else 0
 
