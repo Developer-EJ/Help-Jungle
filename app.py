@@ -180,7 +180,11 @@ def show_post(post_id):
     if not post:
         abort(404)
 
-    return render_template("post.html", post=post)
+    # 3) 댓글 불러오기
+    comments = list(db.comments.find({"post_id": oid}))
+
+
+    return render_template("post.html", post=post, comments = comments)
 
 # 게시물 페이지 제작
 @app.route("/post/new", methods = ["POST"])
@@ -264,21 +268,70 @@ def create_comment(post_id):
     description_receive = request.form.get("description_give")
 
     user_id = my_id()
+    nickname = db.users.find_one({"user_id": user_id}, {"nickname": 1, "_id": 0})
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    now_text = f"{now.year}. {now.month}. {now.day}. {now.hour:02d}:{now.minute:02d}"
 
     doc = {
         "user_id": user_id,
+        "nickname": nickname,
         "description": description_receive,
+        "created_at": now_text,
         "post_id": oid,
         "comment_likes": 0
     }
     db.comments.insert_one(doc)
     return jsonify({'result': 'success'}), 201
 
-# 댓글 좋아요 
-@app.route("/post/<post_id>/comment/likes")
-def likes_comment(post_id):
+# 댓글 좋아요
+@app.route("/post/<post_id>/comment/<comment_id>/likes", methods=["POST"])
+def likes_comment(post_id, comment_id):
+    user_id = my_id()  # 로그인 아이디 문자열
+    if not user_id:
+        return jsonify({"result": "failure", "msg": "로그인이 필요합니다."}), 401
+
+    # 1) ID 형식 검사
+    try:
+        post_oid = ObjectId(post_id)
+        comment_oid = ObjectId(comment_id)
+    except:
+        abort(400)
+
+    # 2) 댓글 존재 확인 + 해당 게시글 소속 댓글인지 확인
+    comment = db.comments.find_one({"_id": comment_oid, "post_id": post_oid})
+    if comment is None:
+        return jsonify({"result": "failure", "msg": "해당 댓글 없음"}), 404
+
+    # 3) 중복 좋아요 검사 (likes 컬렉션)
+    had_like = db.likes.find_one({
+        "user_id": user_id,
+        "comment_id": comment_oid
+    })
+    if had_like is not None:
+        return jsonify({"result": "failure", "msg": "이미 좋아요를 눌렀습니다."}), 409
+
+    # 4) likes 컬렉션에 좋아요 기록 저장 (확실히 눌린 경우)
+    db.likes.insert_one({
+        "user_id": user_id,
+        "comment_id": comment_oid
+    })
+
+    # 5) 댓글 좋아요 수 증가
+    db.comments.update_one(
+        {"_id": comment_oid},
+        {"$inc": {"wonders": 1}}
+    )
+
+    # 6) 증가된 좋아요 수 반환
+    updated_comment = db.comments.find_one({"_id": comment_oid}, {"wonders": 1, "_id": 0})
+    wonders = updated_comment.get("wonders", 0) if updated_comment else 0
+
+    return jsonify({
+        "result": "success",
+        "wonders": wonders
+    }), 200
 
 # ============================== Comments ================================
 
-    if __name__ == "__main__":
-	        app.run("0.0.0.0", port=5000, debug=True)
+if __name__ == "__main__":
+	    app.run("0.0.0.0", port=5000, debug=True)
