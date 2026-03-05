@@ -1,76 +1,183 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<!doctype html>
+<html lang="ko">
+  <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
+    <title>Post | 도와줘요 JUNGLE</title>
     <style>
-        @font-face {
-            font-family: 'Pretendard';
-            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Light.woff2') format('woff2');
-            font-weight: 300;
-            font-display: swap;
-        }
-        body {
-            font-family: 'Pretendard', sans-serif;
-        }
+      @font-face {
+        font-family: 'Pretendard';
+        src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Light.woff2')
+          format('woff2');
+        font-weight: 300;
+        font-display: swap;
+      }
+      body {
+        font-family: 'Pretendard', sans-serif;
+      }
     </style>
-    <title> 게시글 </title>
-</head>
-<body class="bg-gray-100">
+  </head>
+  <body class="bg-gray-100">
     <div class="max-w-5xl mx-auto bg-white min-h-screen">
-        <header class="border-b bg-white">
-            <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                <a href="/dashboard" class="font-bold text-lg hover:opacity-80">
-                    도와줘요 <span class="text-green-500">JUNGLE</span>
-                </a>
-                <div class="flex items-center gap-3">
-                    <button type="button" class="relative p-2 rounded-lg border hover:bg-gray-50" aria-label="알림">
-                        🔔
-                    </button>
-                    <span class="text-sm text-gray-700">
-                        <span class="text-xs text-gray-500 ml-2"> <span id="rank">0</span>등</span>
-                        <span class="font-semibold" id="nickname">사용자</span> 님
-                    </span>
-                    <button id="logout_btn"
-                        class="px-4 py-1.5 rounded-lg border text-sm hover:bg-gray-50 whitespace-nowrap">
-                        로그아웃
-                    </button>
-                </div>
-            </div>
-        </header>
-        <!-- 본문 -->
-        <div>
-            <!-- db에 저장된 게시글 -->
-            <div> db에 저장된 게시글
-                <!-- 문제번호 -->
-                <div class="">
-                    {% for problem in problems %}
-                    {% endfor %}
-                </div>
-                <!-- 제목 -->
-                <div>
-                </div>
-                <!-- 본문 -->
-                <div>
-                </div>
-                <!-- 궁금해 : 이미지 삽입, 기능 연결 -->
-                <div>
-                </div>
-            </div>
-            <!-- 댓글 -->
-            <div>
-                <!-- 댓글 작성창  -->
-                <div>
-                </div>
-                <!-- 작성된 댓글 -->
-                <div>
-                </div>
-            </div>
+      <!-- HEADER -->
+      <header class="border-b bg-white">
+        <div
+          class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between"
+        >
+          <a href="/dashboard" class="font-bold text-lg hover:opacity-80">
+            도와줘요 <span class="text-green-500">JUNGLE</span>
+          </a>
+          <div class="flex items-center gap-3">
+            <button
+              id="notif_btn"
+              type="button"
+              class="relative p-2 rounded-lg border hover:bg-gray-50 {% if has_unread %}bg-red-100{% endif %}"
+              aria-label="알림"
+            >
+              🔔
+            </button>
+            <span class="text-sm text-gray-700">
+              <span class="text-xs text-gray-500 ml-2">{{ rank }}</span> 등
+              <span class="font-semibold">{{ user_id }}</span> 님
+            </span>
+            <button
+              id="logout_btn"
+              class="px-4 py-1.5 rounded-lg border text-sm hover:bg-gray-50 whitespace-nowrap"
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
+      </header>
+      <!-- MAIN -->
+      <main class="px-6 py-8">
+        <!-- 게시글 카드 -->
+        <section class="border rounded-2xl p-6 bg-white">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="text-sm text-gray-500">
+                문제번호
+                <span class="font-semibold text-gray-800"
+                  >{{ post.problem_num }}</span
+                >
+              </div>
+              <h1 class="text-2xl font-extrabold mt-2 break-words">
+                {{ post.title }}
+              </h1>
+              <div class="text-xs text-gray-500 mt-2">
+                작성자
+                <span class="font-semibold text-gray-700"
+                  >{{ post.nickname }}</span
+                >
+                · {{ post.created_at }}
+              </div>
+            </div>
+            <!-- 궁금해 버튼 -->
+          </div>
+          <!-- 내용 -->
+          <div class="mt-6 whitespace-pre-wrap text-gray-800 leading-relaxed">
+            {{ post.content }}
+          </div>
+        </section>
+        <div class="my-5">
+          <form
+            action="/post/{{ post._id }}/wonder"
+            method="POST"
+            class="shrink-0"
+          >
+            <button
+              type="submit"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500 text-black text-sm font-semibold hover:opacity-90"
+            >
+              <span>🤔</span>
+              <span>궁금해요</span>
+              <span
+                class="px-2 py-0.5 rounded-full bg-white/70 text-black text-xs"
+                >{{ post.wonders }}</span
+              >
+            </button>
+          </form>
+        </div>
+        <section id="comment_section" class="mt-8">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-lg">댓글</h2>
+          </div>
+          <!-- 댓글 작성 -->
+          <form
+            action="/post/{{ post._id }}/comment"
+            method="POST"
+            class="border rounded-2xl p-5 bg-white"
+          >
+            <label for="comment_input" class="block text-sm font-semibold mb-2"
+              >댓글 작성</label
+            >
+            <textarea
+              id="comment_input"
+              name="description_give"
+              rows="4"
+              class="w-full border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
+              placeholder="댓글을 입력하세요"
+            ></textarea>
+            <div class="mt-3 flex justify-end">
+              <button
+                type="submit"
+                class="px-5 py-2 bg-green-500 rounded-lg text-black font-semibold hover:opacity-90"
+              >
+                작성
+              </button>
+            </div>
+          </form>
+          <!-- 댓글 목록 -->
+          <div class="mt-5 space-y-3">
+            {% if comments %} {% for c in comments %}
+            <div class="border rounded-2xl p-5 bg-white">
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-gray-800 truncate">
+                    {{ c.nickname }}
+                  </div>
+                  <div class="text-xs text-gray-500 mt-0.5">
+                    {{ c.created_at }}
+                  </div>
+                </div>
+
+                <!-- 댓글 좋아요 -->
+                <form
+                  action="/post/{{ post._id }}/comment/{{ c._id }}/likes"
+                  method="POST"
+                  class="shrink-0"
+                >
+                  <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50"
+                  >
+                    👍 <span class="text-gray-700">{{ c.comment_likes }}</span>
+                  </button>
+                </form>
+              </div>
+              <div class="mt-3 whitespace-pre-wrap text-gray-800">
+                {{ c.description }}
+              </div>
+            </div>
+            {% endfor %} {% else %}
+            <div class="px-4 py-10 text-center text-sm text-gray-500">
+              아직 댓글이 없습니다.
+            </div>
+            {% endif %}
+          </div>
+        </section>
+      </main>
     </div>
-        <script>
- 
-        </script>
-</body>
+    <script>
+      // 로그아웃 (쿠키 삭제 후 홈으로)
+      $('#logout_btn').on('click', function () {
+        $.removeCookie('mytoken', { path: '/' });
+        alert('로그아웃 되었습니다.');
+        window.location.href = '/';
+      });
+    </script>
+  </body>
+</html>
