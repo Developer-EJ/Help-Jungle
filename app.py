@@ -131,6 +131,16 @@ def auth_regist():
 # 대시보드 Refresh
 @app.route('/dashboard', methods=['GET'])
 def update_dashboard():
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+    
     # 0) 현재 페이지 정보 get
     user_id = my_id()
     page = request.args.get("page", default=1, type=int)
@@ -211,6 +221,16 @@ def update_dashboard():
 # 게시물 페이지 출력 
 @app.route("/post/<post_id>", methods=["GET"])
 def show_post(post_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     # 1) ObjectId로 변환
     try:
         oid = ObjectId(post_id)
@@ -231,11 +251,31 @@ def show_post(post_id):
 # 게시물 제작 페이지 출력
 @app.route("/post/create", methods=["GET"])
 def new_post_page():
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     return render_template("createPost.html")
 
 # 게시물 페이지 제작
 @app.route("/post/new", methods = ["POST"])
 def create_post():
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     problem_num_receive = request.form.get("problem_num_give")
     title_receive = request.form.get("title_give")
     content_receive = request.form.get("content_give")
@@ -273,6 +313,16 @@ def create_post():
 # 게시물 궁금해 버튼
 @app.route("/post/<post_id>/wonder", methods=["POST"])
 def add_wonder(post_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     user_id = my_id()
     try:
         oid = ObjectId(post_id)
@@ -306,6 +356,16 @@ def add_wonder(post_id):
 # 댓글 작성
 @app.route("/post/<post_id>/comment", methods=["POST"])
 def create_comment(post_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     try:
         oid = ObjectId(post_id)
     except:
@@ -339,6 +399,16 @@ def create_comment(post_id):
 
 @app.route("/post/<post_id>/comment/<comment_id>/likes", methods=["POST"])
 def likes_comment(post_id, comment_id):
+
+    # JWT 검증
+    token_receive = request.cookies.get('mytoken')
+    try:
+        payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return alert_redirect("로그인 해주세요!", "/")
+    except jwt.exceptions.DecodeError:
+        return alert_redirect("로그인 해주세요!", "/")
+
     user_id = my_id()
     if not user_id:
         return redirect(url_for("show_post", post_id=post_id))
