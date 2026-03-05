@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @font-face {
+            font-family: 'Pretendard';
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Light.woff2') format('woff2');
+            font-weight: 300;
+            font-display: swap;
+        }
+        body {
+            font-family: 'Pretendard', sans-serif;
+        }
+    </style>
+    <title> 게시글 </title>
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-5xl mx-auto bg-white min-h-screen">
+        <header class="border-b bg-white">
+            <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+                <a href="/dashboard" class="font-bold text-lg hover:opacity-80">
+                    도와줘요 <span class="text-green-500">JUNGLE</span>
+                </a>
+                <div class="flex items-center gap-3">
+                    <button type="button" class="relative p-2 rounded-lg border hover:bg-gray-50" aria-label="알림">
+                        🔔
+                    </button>
+                    <span class="text-sm text-gray-700">
+                        <span class="text-xs text-gray-500 ml-2"> <span id="rank">0</span>등</span>
+                        <span class="font-semibold" id="nickname">사용자</span> 님
+                    </span>
+                    <button id="logout_btn"
+                        class="px-4 py-1.5 rounded-lg border text-sm hover:bg-gray-50 whitespace-nowrap">
+                        로그아웃
+                    </button>
+                </div>
+            </div>
+        </header>
+        <!-- 본문 -->
+        <div>
+            <!-- db에 저장된 게시글 -->
+            <div> db에 저장된 게시글
+                <!-- 문제번호 -->
+                <div class="">
+                    {% for problem in problems %}
+                    {% endfor %}
+                </div>
+                <!-- 제목 -->
+                <div>
+                </div>
+                <!-- 본문 -->
+                <div>
+                </div>
+                <!-- 궁금해 : 이미지 삽입, 기능 연결 -->
+                <div>
+                </div>
+            </div>
+            <!-- 댓글 -->
+            <div>
+                <!-- 댓글 작성창  -->
+                <div>
+                </div>
+                <!-- 작성된 댓글 -->
+                <div>
+                </div>
+            </div>
+        </div>
+    </div>
+        <script>
+ 
+        </script>
+</body>

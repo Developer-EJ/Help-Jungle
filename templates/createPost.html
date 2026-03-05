@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    <style>
+        @font-face {
+            font-family: 'Pretendard';
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Light.woff2') format('woff2');
+            font-weight: 300;
+            font-display: swap;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+        }
+    </style>
+
+    <title>게시글 작성</title>
+</head>
+
+<body class="bg-gray-100">
+
+    <div class="max-w-5xl mx-auto bg-white min-h-screen">
+
+        <!-- 헤더 -->
+        <header class="border-b bg-white">
+            <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+
+                <a href="/dashboard" class="font-bold text-lg hover:opacity-80">
+                    도와줘요 <span class="text-green-500">JUNGLE</span>
+                </a>
+
+                <div class="flex items-center gap-3">
+
+                    <button id="notif_btn"
+                        class="relative p-2 rounded-lg border hover:bg-gray-50 {% if has_unread %}bg-red-100{% endif %}">
+                        🔔
+                    </button>
+
+                    <span class="text-sm text-gray-700 whitespace-nowrap">
+                        <span class="text-xs text-gray-500 ml-2">{{ rank }}</span> 등
+                        <span class="font-semibold">{{ user_id }}</span> 님
+                    </span>
+
+                    <button id="logout_btn"
+                        class="px-4 py-1.5 rounded-lg border text-sm hover:bg-gray-50 whitespace-nowrap">
+                        로그아웃
+                    </button>
+
+                </div>
+            </div>
+        </header>
+
+
+        <!-- 메인 -->
+        <main class="px-6 py-10">
+
+            <form class="space-y-6 bg-gray-100 p-10 mx-auto w-full max-w-4xl rounded-xl">
+
+                <div>
+                    <label class="font-bold">문제번호</label>
+                    <input type="text" id="problem" class="w-1/4 p-2 border rounded-md">
+                </div>
+
+                <div>
+                    <label class="font-bold">제목</label>
+                    <input type="text" id="title" class="w-full p-2 border rounded-md">
+                </div>
+
+                <div class="flex flex-col space-y-2">
+                    <label class="font-bold">내용</label>
+
+                    <textarea id="content"
+                        class="h-[500px] appearance-none w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:bg-white focus:border-gray-900 resize-none"></textarea>
+
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="button" onclick="postProblem()"
+                        class="font-bold px-5 py-2 bg-green-500 rounded-md text-black hover:opacity-90">
+                        작성
+                    </button>
+                </div>
+
+            </form>
+
+        </main>
+    </div>
+
+    <script>
+        $("#logout_btn").click(function () {
+            $.removeCookie('mytoken', { path: '/' }); // 쿠키 삭제
+            alert('로그아웃 되었습니다.');
+            window.location.href = "/"; // 로그인 페이지로 이동
+        });
+
+        function postProblem() {
+
+            let problem = $("#problem").val();
+            let title = $("#title").val();
+            let content = $("#content").val();
+
+            $.ajax({
+                type: "POST",
+                url: "/post/new",
+                data: {
+                    problem_num_give: problem,
+                    title_give: title,
+                    content_give: content
+                },
+
+                success: function (response) {
+
+                    if (response.result == "success") {
+                        alert("게시글 작성 성공");
+                        window.location.href = "/dashboard";
+                    } else {
+                        alert("작성 실패");
+                    }
+
+                }
+
+            });
+
+        }
+
+    </script>
+
+</body>
+
+</html>

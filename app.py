@@ -1,7 +1,49 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, flash
 from pymongo import MongoClient
+from bson.objectid import ObjectId
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from os import abort
+from pymongo.errors import DuplicateKeyError
+
+
+import jwt
+import datetime
 
 app = Flask(__name__)
+
+# jwt 암호키 하드코딩
+SECRET_KEY = 'helpjungle_jwt'
+app.secret_key = 'helpjungle_jwt'
+
+# 현재 접속된 토큰에서 아이디 찾는 함수
+def my_id():
+    token_receive = request.cookies.get('mytoken')
+    payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])
+    user_id = payload['id']
+    return user_id
+
+# 알림 후 리다이렉션
+def alert_redirect(message, url):
+    return f'''
+        <script>
+            alert("{message}");
+            window.location.href = "{url}";
+        </script>
+    '''
+
+# 페이지 랜딩 시 토큰검증 템플릿
+# @app.route('/dashboard', methods=['GET'])
+# def update_dashboard():
+#     token_receive = request.cookies.get('mytoken')
+#     try:
+#         payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])        
+#         return render_template('dashboard.html')
+#     except jwt.ExpiredSignatureError:
+#         return alert_redirect("로그인 해주세요!", "/")
+#     except jwt.exceptions.DecodeError:
+#         return alert_redirect("로그인 해주세요!", "/")
+
 
 # ================== MongoDB 연결 ==================
 client = MongoClient("mongodb://localhost:27017")
@@ -9,18 +51,54 @@ db = client["helpjungle"]
 # ==================================================
 
 # ==================== 최초 화면 렌더링 ====================
-@app.route("/auth/login")
+@app.route("/")
 def home():
-    return render_template("login.html")
+    token_receive = request.cookies.get('mytoken')
+    
+    # 토큰 존재 여부 확인
+    if token_receive:        
+
+            # 토큰 복호화 및 유저 정보 조회
+            payload = jwt.decode(token_receive, SECRET_KEY, algorithms=['HS256'])            
+            return redirect('/dashboard')
+    else:
+        # 토큰이 없는 경우
+        return render_template("login.html")
+# =========================================================
+
+# ========================= 로그인 ========================
+@app.route("/auth/login", methods=["POST"])
+def auth_login():
+    id_receive       = request.form["id_give"]
+    pwd_receive      = request.form["pwd_give"]
+
+    # 로그인 정보 받아오기
+    result = {
+        "id": id_receive,
+        "pwd": pwd_receive
+    }    
+    user = db.users.find_one(result)
+    # 로그인 성공 시 JWT 생성
+    if user is not None:            
+        payload = {
+            'id' : id_receive,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=3600)
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm = 'HS256')
+        return jsonify({"result": "success", "msg": "로그인 성공", "token" : token})
+        
+    # DB에 로그인 정보 없으면 로그인 실패
+    else:
+        return jsonify({"result": "fail", "msg": "로그인 실패"})
 # =========================================================
 
 # ==================== 회원가입 submit ====================
-@app.route("/auth/regist", methods=["POST"])
+@app.route("/auth/signUp", methods=["POST"])
 def auth_regist():
     id_receive       = request.form["id_give"]
     pwd_receive      = request.form["pwd_give"]
     pwd2_receive     = request.form["pwd2_give"]
-    nickname_receive = request.form["nickname_give"]  # 키 이름 통일 권장
+    nickname_receive = request.form["nickname_give"]
 
     # 예외 1. 빈값 예외처리
     if id_receive == "" or pwd_receive == "" or pwd2_receive == "" or nickname_receive == "":
@@ -49,5 +127,158 @@ def auth_regist():
         return jsonify({"result": "success", "msg": "회원가입이 완료되었습니다."})
 # =========================================================
 
-if __name__ == "__main__":
-    app.run("0.0.0.0", port=5000, debug=True)
+# ============================= Dashboard ================================
+# 대시보드 Refresh
+@app.route('/dashboard', methods = ['GET'])
+def update_dashboard():
+    # 0) 현재 페이지 정보 get
+    total_count = db.posts.count_documents({})
+    page_count = (total_count + 9) // 10  
+
+    page = request.args.get("page", default=1, type=int)
+    sort_method = request.args.get("sort", default="default")
+    page_size = 10
+    skip_range = (page - 1) * page_size
+    # 1) 랭킹 Top3 추출
+    rankers = list(db.users.find({}).sort('score', -1).limit(3))
+
+    # 2) 게시물 리스트 10개 리스트 업
+    post_filter = {}
+    sort_spec = [("_id", -1)] 
+
+    if sort_method in ("default", "recent"):
+        sort_spec = [("_id", -1)]
+    elif sort_method == "wonder":  
+        sort_spec = [("wonders", -1), ("_id", -1)]
+    elif sort_method == "my_post":
+        user_id = my_id()
+        post_filter = {"author_Id": user_id}
+        sort_spec = [("_id", -1)]
+
+    posts = list(db.posts.find(post_filter).sort(sort_spec).skip(skip_range).limit(page_size))
+
+    # 3) 사용자 정보 (닉네임, 등수)
+
+    # 4) 알람 유무 확인(notifications 컬렉션 열람해서 isRead 컬럼이 1인 데이터 유무 확인)
+    has_unread = db.notifications.count_documents({"userId": user_id, "isRead": 0}) > 0
+
+    return render_template("dashboard.html", page = page, rankers = rankers, posts = posts, page_count = page_count, has_unread = has_unread)
+# ============================= Dashboard ================================
+
+# =============================== Posts ==================================
+# 게시물 페이지 출력 
+@app.route("/post/<post_id>", methods=["GET"])
+def show_post(post_id):
+    # 1) ObjectId로 변환
+    try:
+        oid = ObjectId(post_id)
+    except:
+        abort(404)
+
+    # 2) 글 조회
+    post = db.posts.find_one({"_id": oid})
+    if not post:
+        abort(404)
+
+    return render_template("post.html", post=post)
+
+# 게시물 페이지 제작
+@app.route("/post/new", methods = ["POST"])
+def create_post():
+    problem_num_receive = request.form.get("problem_num_give")
+    title_receive = request.form.get("title_give")
+    content_receive = request.form.get("content_give")
+
+    # 공란 검사
+    if not problem_num_receive or not title_receive or not content_receive:
+        return jsonify({"result": "fail", "msg": "입력값 공란!"}), 400
+
+    # 형식 검사
+    try:
+        problem_num_receive = int(problem_num_receive)
+    except ValueError:
+        return jsonify({"result": "fail", "msg": "형식 오류!"}), 400
+
+    # 게시 시간 및 저자 저장
+    user_id = my_id()
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    now_text = f"{now.year}. {now.month}. {now.day}. {now.hour:02d}:{now.minute:02d}"
+
+    doc = {
+        "problem_num": int(problem_num_receive),
+        "title": title_receive,
+        "content": content_receive,
+        "authorId": user_id ,
+        "created_at": now_text,
+        "wonders": 0,
+        "commentCount": 0,
+    }
+    db.posts.insert_one(doc)
+    return jsonify({'result': 'success'}), 201
+        
+# 게시물 궁금해 버튼
+@app.route("/post/<post_id>/wonder", methods=["POST"])
+def add_wonder(post_id):
+    user_id = my_id()
+    try:
+        oid = ObjectId(post_id)
+    except:
+        abort(400)
+
+    post = db.posts.find_one({'_id': oid})
+    if post is None:
+        return jsonify({'result': 'failure', 'msg': '해당 게시글 없음'}), 404
+    
+    # 사용자가 해당 게시글에 궁금해를 누른 적 있나 검사
+    had_wonder = db.wonders.find_one({'user_id': user_id, 'post_id': oid})
+    if had_wonder is not None:
+        return jsonify({'result': 'failure', 'msg': '이미 궁금해 눌렀음'}), 409
+
+    try:
+        db.wonders.insert_one({"user_id": user_id, "post_id": oid})
+    except DuplicateKeyError:
+        return jsonify({"result": "failure", "msg": "중복 클릭 감지"}), 409
+    
+    # 게시글 궁금해 수 증가
+    db.posts.update_one({'_id': oid}, {'$inc': {'wonders': 1}})
+    updated_post = db.posts.find_one({'_id': oid}, {'wonders': 1})
+
+    return jsonify({
+        'result': 'success',
+        'wonders': updated_post.get('wonders', 0)
+    })
+
+        
+# =============================== Posts ==================================
+
+    
+# ============================== Comments ================================
+# 댓글 작성
+@app.route("/post/<post_id>/comment")
+def create_comment(post_id):
+    try:
+        oid = ObjectId(post_id)
+    except:
+        abort(404)
+
+    description_receive = request.form.get("description_give")
+
+    user_id = my_id()
+
+    doc = {
+        "user_id": user_id,
+        "description": description_receive,
+        "post_id": oid,
+        "comment_likes": 0
+    }
+    db.comments.insert_one(doc)
+    return jsonify({'result': 'success'}), 201
+
+# 댓글 좋아요 
+@app.route("/post/<post_id>/comment/likes")
+def likes_comment(post_id):
+
+# ============================== Comments ================================
+
+    if __name__ == "__main__":
+	        app.run("0.0.0.0", port=5000, debug=True)
