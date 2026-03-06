@@ -198,8 +198,8 @@ def update_dashboard():
 
     user_rank = None
     if user:
-        my_score = user.get("score", 0)
-        user_rank = db.users.count_documents({"score": {"$gt": my_score}}) + 1
+        likes = user.get("user_likes", 0)
+        user_rank = db.users.count_documents({"user_likes": {"$gt": likes}}) + 1
 
     # 7) 안 읽은 알림 목록 조회
     notifications = list(db.notifications.find({"receiver_id": user_id, "isRead": 0}).sort("_id", -1))
@@ -254,8 +254,8 @@ def show_post(post_id):
 
     user_rank = None
     if user:
-        my_score = user.get("score", 0)
-        user_rank = db.users.count_documents({"score": {"$gt": my_score}}) + 1
+        likes = user.get("user_likes", 0)
+        user_rank = db.users.count_documents({"user_likes": {"$gt": likes}}) + 1
 
     # 6) 알람 목록 조회
     notifications = list(db.notifications.find({"receiver_id": user_id, "isRead": 0}).sort("_id", -1))
@@ -273,8 +273,19 @@ def new_post_page():
         return alert_redirect("로그인 해주세요!", "/")
     except jwt.exceptions.DecodeError:
         return alert_redirect("로그인 해주세요!", "/")
+    
+    #  사용자 정보 (닉네임, 등수)
+    user_id = my_id()
+    user = db.users.find_one({"id": user_id})
 
-    return render_template("createPost.html")
+    user_rank = None
+    if user:
+        likes = user.get("user_likes", 0)
+        user_rank = db.users.count_documents({"user_likes": {"$gt": likes}}) + 1
+
+    notifications = list(db.notifications.find({"receiver_id": user_id, "isRead": 0}).sort("_id", -1))
+
+    return render_template("createPost.html", notifications=notifications, user=user, user_rank=user_rank)
 
 # 게시물 페이지 제작
 @app.route("/post/new", methods = ["POST"])
@@ -433,7 +444,10 @@ def delete_post(post_id):
     # 5) 게시글 삭제
     db.posts.delete_one({"_id": oid})
 
-    # 6) 삭제 후 메인화면으로 빠져나가기
+    # 6) 알람 삭제
+    db.notifications.delete_many({"post_id": oid})
+
+    # 7) 삭제 후 메인화면으로 빠져나가기
     return redirect(url_for("update_dashboard"))
 
 # =============================== Posts ==================================
@@ -501,9 +515,9 @@ def create_comment(post_id):
 
     return redirect(url_for("show_post", post_id=post_id))
 
+# 댓글 좋아요
 @app.route("/post/<post_id>/comment/<comment_id>/likes", methods=["POST"])
 def likes_comment(post_id, comment_id):
-
     # JWT 검증
     token_receive = request.cookies.get('mytoken')
     try:
