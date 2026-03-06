@@ -86,7 +86,7 @@
             </div>
             <!-- 궁금해 버튼 -->
             {% if user_id == post.author_id %}
-            <form action="/posts/{{ post.id }}/delete" method="POST">
+            <form action="/post/{{ post._id }}/delete" method="POST">
               <button class="text-red-500 text-sm">삭제</button>
             </form>
             {% endif %}
